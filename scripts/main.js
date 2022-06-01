@@ -1,7 +1,30 @@
-let current_operation = "";
+import { $ } from "./toolbox.mjs";
+
+let has_operator = false;
+// try FSM for creating string expressiongi
+function bind_events() {
+   const display = $("#display");
+   //add the numbers to the display if pressed
+   for (let i = 0; i < 10; i++) {
+      $("#num" + i).addEventListener("click", (event) => {
+         display.value += event.target.dataset.number;
+      });
+   }
+   const operators = [
+      { id: "#add", symbol: "+" },
+      { id: "#sub", symbol: "-" },
+      { id: "#mul", symbol: "*" },
+      { id: "#div", symbol: "/" },
+   ];
+   operators.forEach((op) => {
+      $(op.id).addEventListener("click", (event) => {
+         if (!display.value.includes(op.symbol)) display.value += event.target.dataset.symbol;
+      });
+   });
+}
 
 function calculate_operation() {
-   let str = "10+10";
+   let str = "10+10"; // here comes the input later
    if (!is_valid_operation(str)) return error("Invalid expression");
    let [status, result] = calculate(str);
 }
@@ -66,3 +89,5 @@ function ok(result) {
 function error(reason) {
    return ["error", reason];
 }
+
+bind_events();

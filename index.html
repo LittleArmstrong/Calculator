@@ -10,33 +10,33 @@
    <body>
       <main>
          <div class="calculator">
-            <input class="display" type="text" readonly />
+            <input id="display" class="display" type="text" readonly />
             <div class="inputs">
                <div class="inputs-left">
                   <div class="clear-btns">
-                     <button class="clr-btn">DEL</button>
-                     <button class="clr-btn">AC</button>
+                     <button id="DEL" class="clr-btn">DEL</button>
+                     <button id="AC" class="clr-btn">AC</button>
                   </div>
                   <div class="number-pad">
-                     <button class="num-pad-btn">1</button>
-                     <button class="num-pad-btn">2</button>
-                     <button class="num-pad-btn">3</button>
-                     <button class="num-pad-btn">4</button>
-                     <button class="num-pad-btn">5</button>
-                     <button class="num-pad-btn">6</button>
-                     <button class="num-pad-btn">7</button>
-                     <button class="num-pad-btn">8</button>
-                     <button class="num-pad-btn">9</button>
-                     <button class="num-pad-btn big">0</button>
-                     <button class="num-pad-btn">.</button>
+                     <button data-number="1" id="num1" class="num-pad-btn">1</button>
+                     <button data-number="2" id="num2" class="num-pad-btn">2</button>
+                     <button data-number="3" id="num3" class="num-pad-btn">3</button>
+                     <button data-number="4" id="num4" class="num-pad-btn">4</button>
+                     <button data-number="5" id="num5" class="num-pad-btn">5</button>
+                     <button data-number="6" id="num6" class="num-pad-btn">6</button>
+                     <button data-number="7" id="num7" class="num-pad-btn">7</button>
+                     <button data-number="8" id="num8" class="num-pad-btn">8</button>
+                     <button data-number="9" id="num9" class="num-pad-btn">9</button>
+                     <button data-number="0" id="num0" class="num-pad-btn big">0</button>
+                     <button data-number="." id="dot" class="num-pad-btn">.</button>
                   </div>
                </div>
                <div class="operators">
-                  <button class="op-btn">+</button>
-                  <button class="op-btn">-</button>
-                  <button class="op-btn">*</button>
-                  <button class="op-btn">%</button>
-                  <button class="op-btn">=</button>
+                  <button data-symbol="+" id="add" class="op-btn">+</button>
+                  <button data-symbol="-" id="sub" class="op-btn">-</button>
+                  <button data-symbol="*" id="mul" class="op-btn">*</button>
+                  <button data-symbol="/" id="div" class="op-btn">/</button>
+                  <button id="eq" class="op-btn">=</button>
                </div>
             </div>
          </div>
