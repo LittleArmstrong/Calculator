@@ -10,7 +10,7 @@
    <body>
       <main>
          <div class="calculator">
-            <input class="display" type="text" readonly />
+            <input id="display" class="display" type="text" readonly />
             <div class="inputs">
                <div class="inputs-left">
                   <div class="clear-btns">
@@ -32,11 +32,11 @@
                   </div>
                </div>
                <div class="operators">
-                  <button class="op-btn">+</button>
-                  <button class="op-btn">-</button>
-                  <button class="op-btn">*</button>
-                  <button class="op-btn">%</button>
-                  <button class="op-btn">=</button>
+                  <button data-symbol="+" id="add" class="op-btn">+</button>
+                  <button data-symbol="-" id="sub" class="op-btn">-</button>
+                  <button data-symbol="*" id="mul" class="op-btn">*</button>
+                  <button data-symbol="/" id="div" class="op-btn">/</button>
+                  <button id="eq" class="op-btn">=</button>
                </div>
             </div>
          </div>
