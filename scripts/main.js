@@ -1,43 +1,53 @@
 import { $ } from "./toolbox.mjs";
 
 const display = $("#display");
+const char_stream = {
+   init(handler, fsm) {
+      this.handler = handler;
+      this.fsm = fsm;
+   },
+   events: [],
+   handler: null,
+   fsm: null,
+   push(event, value = event) {
+      this.events.push([event, value]);
+      this.handler(this, calc_fsm);
+   },
+   shift() {
+      return this.events.shift();
+   },
+};
 
-// try FSM for creating string expressiongi
 function bind_events() {
-   //add the numbers to the display if pressed
+   const char_inputs = [
+      { key: "-", id: "#sub" },
+      { key: "+", id: "#add" },
+      { key: "*", id: "#mul" },
+      { key: "/", id: "#div" },
+      { key: ".", id: "#dot" },
+      { key: "Enter=", id: "#eq" },
+      { key: "Delete", id: "#ac" },
+   ];
+   //add the number 0-9 events
    for (let i = 0; i < 10; i++) {
-      $("#num" + i).addEventListener("click", (event) => {
-         manage_event("num", event.target.dataset.number);
-      });
+      char_inputs.push({ key: "" + i, id: "#num" + i });
    }
-
-   // the dot for floats
-   $("#dot").addEventListener("click", (event) => {
-      manage_event("dot", event.target.dataset.symbol);
-   });
-
-   // specific event, because it also counts as a sign
-   $("#sub").addEventListener("click", (event) => {
-      manage_event("minus", event.target.dataset.symbol);
-   });
-
-   // other math operators that add only their symbols saved in the data attr
-   const other_operators = ["#add", "#mul", "#div"];
-   other_operators.forEach((op) => {
-      $(op).addEventListener("click", (event) => {
-         manage_event("operator", event.target.dataset.symbol);
+   //add the events/chars to stream if clicked
+   char_inputs.forEach((input) => {
+      $(input.id).addEventListener("click", (event) => {
+         const data = event.target.dataset;
+         char_stream.push(data.event, data.value);
       });
    });
-
-   // equal to only evaluate
-   $("#eq").addEventListener("click", (event) => {
-      manage_event("equal", "");
-   });
-
-   // all clear
-   $("#ac").addEventListener("click", (event) => {
-      manage_event("all_clear", "");
-   });
+   //simulate clicking the buttons with keypresses (keyup)
+   document.onkeyup = (event) => {
+      char_inputs.some((input) => {
+         if (input.key.includes(event.key)) {
+            $(input.id).click();
+            return true;
+         }
+      });
+   };
 }
 
 const calc_fsm = {
@@ -45,73 +55,81 @@ const calc_fsm = {
       //#current state     new state      action to take
       //------------------------------------------------
       clear: {
-         minus: ["int_1", "add_first_char_to_display"],
-         num: ["int_1", "add_first_char_to_display"],
+         minus: ["sign_1", "add_first_char"],
+         num: ["int_1", "add_first_char"],
+      },
+      sign_1: {
+         num: ["int_1", "add_char"],
       },
       int_1: {
-         operator: ["operator", "add_to_display"],
-         minus: ["operator", "add_to_display"],
-         num: ["int_1", "add_to_display"],
-         dot: ["float_1", "add_to_display"],
+         operator: ["operator", "add_char"],
+         minus: ["operator", "add_char"],
+         num: ["int_1", "add_char"],
+         dot: ["float_1", "add_char"],
          all_clear: ["clear", "clear_all"],
       },
       float_1: {
-         operator: ["operator", "add_to_display"],
-         minus: ["operator", "add_to_display"],
-         num: ["float_1", "add_to_display"],
+         operator: ["operator", "add_char"],
+         minus: ["operator", "add_char"],
+         num: ["float_1", "add_char"],
          all_clear: ["clear", "clear_all"],
       },
       operator: {
-         minus: ["int_2", "add_to_display"],
-         num: ["int_2", "add_to_display"],
+         minus: ["sign_2", "add_char"],
+         num: ["int_2", "add_char"],
          all_clear: ["clear", "clear_all"],
       },
+      sign_2: {
+         num: ["int_2", "add_char"],
+      },
       int_2: {
-         operator: ["operator", "calculate"],
-         equal: ["eval", "calculate"],
-         num: ["int_2", "add_to_display"],
-         dot: ["float_2", "add_to_display"],
+         operator: ["operator", "calc"],
+         minus: ["operator", "calc"],
+         equal: ["eval", "calc"],
+         num: ["int_2", "add_char"],
+         dot: ["float_2", "add_char"],
          all_clear: ["clear", "clear_all"],
       },
       float_2: {
-         operator: ["eval", "calculate"],
-         equal: ["eval", "calculate"],
-         num: ["float_2", "add_to_display"],
+         operator: ["eval", "calc"],
+         minus: ["operator", "calc"],
+         equal: ["eval", "calc"],
+         num: ["float_2", "add_char"],
          all_clear: ["clear", "clear_all"],
       },
       eval: {
-         operator: ["operator", "add_to_display"],
-         minus: ["operator", "add_to_display"],
+         operator: ["operator", "add_char"],
+         minus: ["operator", "add_char"],
          all_clear: ["clear", "clear_all"],
       },
    },
    state: "clear",
    action: null,
+   default_event: "default",
    default_action: "ignore",
-   accept_event(event) {
+   accept(event) {
       [this.state, this.action] = this.transitions[this.state][event] ||
-         this.transitions[this.state]["default"] || [this.state, this.default_action];
+         this.transitions[this.state][this.default_event] || [this.state, this.default_action];
       return this.action;
    },
 };
 
-function manage_event(event, value) {
-   const action = calc_fsm.accept_event(event);
+function handle_events(stream, fsm) {
+   const [event, value] = stream.shift();
+   const action = fsm.accept(event);
    switch (action) {
-      case calc_fsm.default_action:
+      case fsm.default_action:
          break;
-      case "add_first_char_to_display":
+      case "add_first_char":
          display.value = value;
          break;
-      case "add_to_display":
+      case "add_char":
          display.value += value;
          break;
-      case "calculate":
+      case "calc":
          const [stat, result] = calculate(display.value);
-         display.value = result + value;
-         if (stat === "error") {
-            calc_fsm.state = "clear";
-         }
+         display.value = result;
+         stat === "ok" ? (display.value += value) : (fsm.state = "clear");
          break;
       case "clear_all":
          display.value = "";
@@ -139,17 +157,20 @@ function calculate(string) {
          result = div(numbers);
          break;
       default:
-         return error(`No case for "${operator}" operator`);
+         return error(`No such case: "${operator}"`);
          break;
    }
-   return Number.isFinite(result) ? ok(result) : error("Result is not a number");
+   return Number.isFinite(result) ? ok(result) : error("NaN");
 }
 
 function parse_math_operation(string) {
-   //first regex matches first number with sign and second matches second number with sign if there is an operator already
-   const numbers = string.match(/^-?\d*\.?\d+|(?<=[-+*/$])-?\d*\.?\d+/g).map(Number);
+   //first regex matches first number (with sign if present) and second matches second number (with sign if preceded by an operator)
+   //converts the strings tu numbers
+   const numbers = string
+      .match(/^-?\d*\.?\d+(?:e[-+]?\d+)?|(?<=[-+*/])-?\d*\.?\d+(?:e[-+]?\d+)?/g)
+      .map(Number);
    // takes the first operator that is preceded by a number
-   const operator = string.match(/(?<=\d)[-+*\/]/)[0];
+   const operator = string.match(/(?<=\d.?)[-+*\/]/)[0];
    return [numbers, operator];
 }
 
@@ -177,16 +198,5 @@ function error(reason) {
    return ["error", reason];
 }
 
-function add_to_display(value) {
-   add_to_output(value, display);
-}
-
-function add_to_output(value, node) {
-   node.value += value;
-}
-
-function do_nothing() {
-   //pass, to avoid calling error
-}
-
 bind_events();
+char_stream.init(handle_events, calc_fsm);
