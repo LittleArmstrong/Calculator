@@ -114,50 +114,29 @@ const calc_fsm = {
    },
 };
 
-let curr_num_state = "initial";
-let curr_expr = "";
-let is_last_num = false;
-const num_transitions = {
-   //#current state     new state      action to take
-   //------------------------------------------------
-   initial: {
-      minus: ["sign", "add_char"],
-      num: ["int", "add_char"],
-   },
-   sign: {
-      num: ["int", "add_char"],
-   },
-   int: {
-      operator: ["operator", "add_char"],
-      minus: ["operator", "add_char"],
-      num: ["int", "add_char"],
-      dot: ["float", "add_char"],
-   },
-   float: {
-      operator: ["done", "ignore"],
-      minus: ["done", "ignore"],
-      num: ["float", "add_char"],
-   },
-   done: {},
-};
-
-function calc_expr(str_expr) {
-   const char_stream = parse_math_expr(str_expr);
-   while (char_stream.length !== 0) {
-      const [event, char] = char_stream.shift();
-      const [cur_num_state, action] = accept_event(event, cur_num_state, num_transitions);
-
-      if (action === "add_char") curr_expr += char;
-      if (cur_num_state === "done") {
-         cur_num_state = "initial";
-         if (is_last_num) {
-            const res = calculate(); //hererere
-            is_last_num = false;
-         } else {
-            curr_expr += char;
-            is_last_num = true;
-         }
-      }
+function handle_events(stream, fsm) {
+   const [event, value] = stream.shift();
+   const action = fsm.accept(event);
+   switch (action) {
+      case fsm.default_action:
+         break;
+      case "add_first_char":
+         display.value = value;
+         break;
+      case "add_char":
+         display.value += value;
+         break;
+      case "calc":
+         const [stat, result] = calculate(display.value);
+         display.value = result;
+         stat === "ok" ? (display.value += value) : (fsm.state = "clear");
+         break;
+      case "clear_all":
+         display.value = "";
+         break;
+      default:
+         throw new Error(`No such case: "${action}"`);
+         break;
    }
 }
 
@@ -253,4 +232,4 @@ function error(reason) {
 }
 
 bind_events();
-char_stream.init(handle_calc_event, calc_fsm);
+char_stream.init(handle_events, calc_fsm);
