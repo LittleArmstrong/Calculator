@@ -1,131 +1,195 @@
 import { $ } from "./toolbox.mjs";
 
-class FSM {
-   constructor(
-      transitions,
-      { init_state = "default", def_event = "default", def_action = "ignore" } = {}
-   ) {
-      this.transitions = transitions;
-      this.init_state = this.state = init_state;
-      this.def_event = def_event;
-      this.def_action = def_action;
-   }
+const events = [
+   { name: "num", regex: /\d/ },
+   { name: "del", regex: /d/ },
+   { name: "ac", regex: /a/ },
+   { name: "op", regex: /[+*/]/ },
+   { name: "minus", regex: /-/ },
+   { name: "dot", regex: /\./ },
+   { name: "eq", regex: /=/ },
+   { name: "base", regex: /e/ },
+];
+
+const num_fsm = {
+   transitions: {
+      init: {
+         minus: ["num_sign", "add_char"],
+         num: ["int", "add_char"],
+      },
+      num_sign: {
+         num: ["int", "add_char"],
+      },
+      int: {
+         num: ["int", "add_char"],
+         minus: ["initial", "as_op"],
+         dot: ["float", "add_char"],
+         base: ["base", "add_char"],
+      },
+      float: {
+         num: ["float", "add_char"],
+         minus: ["initial", "as_op"],
+      },
+      base: { minus: ["exp_sign", "add_char"], num: ["exp", "add_char"] },
+      exp_sign: {
+         num: ["exp", "add_char"],
+      },
+      exp: {
+         num: ["exp", "add_char"],
+         minus: ["initial", "as_op"],
+      },
+   },
+   init_state: "init",
+   state: "init",
+   def_event: "def",
+   def_action: "ignore",
+   tstates: ["int", "float", "exp"],
 
    accept(event) {
       const [next_state, action] = this.transitions[this.state][event] ||
          this.transitions[this.state][this.def_event] || [this.state, this.def_action];
       this.state = next_state;
       return action;
-   }
+   },
 
    reset() {
       this.state = this.init_state;
-   }
+   },
+
+   is_tstate(state) {
+      return this.tstates.includes(state);
+   },
+};
+
+const expr_nfsm = {
+   init_state: "init",
+   state: "init",
+   def_FSMs: [],
+   def_event: "def",
+   def_action: "ignore",
+   FSMs: { num: num_fsm },
+   transitions: {
+      init: {
+         op: {
+            FSMs: ["num"],
+            action: "next_num",
+            next: "next_num",
+         },
+         def: { FSMs: [], action: "call_num_fsm", next: "init" },
+      },
+      next_num: {
+         op: {
+            FSMs: ["num"],
+            action: "calc_next",
+            next: "next_num",
+         },
+         eq: {
+            FSMs: ["num"],
+            action: "calc",
+            next: "next_num",
+         },
+         def: {
+            FSMs: ["num"],
+            action: "call_num_fsm",
+            next: "next_num",
+         },
+      },
+   },
+   accept(event) {
+      let { FSMs, action, next } = this.transitions[this.state][event] ||
+         this.transitions[this.state][this.def_event] || [
+            this.def_FSMs,
+            this.def_action,
+            this.state,
+         ];
+      console.log(FSMs);
+      if (!FSMs.every((FSM) => this.FSMs[FSM].is_tstate())) {
+         action = this.def_action;
+      } else {
+         this.state = next;
+      }
+      return action;
+   },
+   reset() {
+      this.state = this.init_state;
+   },
+};
+
+function calc_expr(str) {
+   const stream = parse_expr(str, events);
+   const expr = handle_stream(stream, expr_nfsm);
+   return expr;
 }
 
-const char_stream = {
+/**
+ * Parses the string expression and creates an event stream based on the given events
+ *
+ * @param {String} str                               The expression to be parsed
+ * @param {{event:String, regex: RegExp}[]} events   An Array of the events and the corresponding regex the expr should contain
+ * @returns {[string, String][]}                     an event stream with the event and corresponding char
+ */
+function parse_expr(str, events) {
+   const chars = str.split("");
+   const stream = [];
+   chars.forEach((char) => {
+      events.some((event) => {
+         return event.regex.test(char) ? stream.push([event.name, char]) : false;
+      });
+   });
+   return stream;
+}
+
+const event_stream = {
    get: [],
-   push(event, char) {
-      const new_length = this.stream.push([event, char]);
+   push([event, char], ...rest) {
+      const new_length = this.stream.push([event, char], ...rest);
       return new_length;
    },
    shift() {
       return this.stream.shift();
    },
-   unshift(event, char) {
-      return this.stream.unshift([event, char]);
+   unshift([event, char], ...rest) {
+      return this.stream.unshift([event, char], ...rest);
    },
 };
 
-const supv_transitions = {
-   first_num: {
-      operator: ["last_num", "add_char"],
-      all_clear: ["first_num", "clear_all"],
-      default: ["first_num", "call_num_fsm"],
-   },
-
-   last_num: {
-      operator: ["first_num", "calc_next"],
-      all_clear: ["first_num", "clear_all"],
-      eq: ["first_num", "calc"],
-      default: ["last_num", "call_num_fsm"],
-   },
-};
-
-const num_transitions = {
-   initial: {
-      minus: ["int", "add_char"],
-      num: ["int", "add_char"],
-   },
-   int: {
-      num: ["int", "add_char"],
-      minus: ["initial", "as_operator"],
-      dot: ["float", "add_char"],
-   },
-   float_1: {
-      num: ["float_1", "add_char"],
-      minus: ["initial", "as_operator"],
-   },
-};
-
-const supv_fsm = new FSM(supv_transitions);
-const num_fsm = new FSM(num_transitions);
-
-const math_expr = {
-   get: "",
-   add_char(char) {
-      this.get += char;
-   },
-   clear() {
-      this.get = "";
-   },
-};
-
-function handle_stream(stream, { expr, expr_fsm, num_fsm }) {
-   let [event, char] = stream.shift();
-   let action = expr_fsm.accept;
-}
-
-function handle_expr_fsm([event, char], { expr, expr_fsm, num_fsm }) {
-   const action = expr_fsm.accept(event);
-   let status = ok(char);
-   switch (action) {
-      case "add_char":
-         expr.add_char(char);
-         break;
-      case "clear_all":
-         expr.clear();
-         break;
-      case "call_num_fsm":
-         status = handle_num_fsm([event, char], { expr: expr, fsm: num_fsm });
-         break;
-      case "calc":
-         console.log("calc");
-         break; //here
-      case "calc_next":
-         console.log("calc_next");
-         break;
+function handle_stream(event_stream, nfsm) {
+   let expr = ""; // new valid expr to return
+   const stream = [...event_stream]; // the events to work through
+   const actions = []; // the actions caused from one event to work through
+   console.table(stream);
+   while (stream.length !== 0) {
+      //check which action to take depending on the state and event
+      let [event, char] = stream.shift();
+      actions.push(nfsm.accept(event));
+      //execute the action
+      while (actions.length !== 0) {
+         let action = actions.shift();
+         switch (action) {
+            case "ignore":
+               break;
+            case "add_char":
+               expr += char;
+               break;
+            case "call_num_fsm": // create valid num with fsm
+               actions.push(nfsm.fsms.num.accept(event));
+               break;
+            case "next_num":
+               nfsm.fsms.num.reset();
+               actions.push("add_char");
+               break;
+            case "calc": // calculate the result of expr
+               console.log("calc");
+               //calculate expr
+               break; //here
+            case "calc_next": // calculate the expr and add the chosen operator
+               //calculate and add char op/create event
+               console.log("calc_next");
+               break;
+         }
+      }
    }
-   return status;
+   return expr;
 }
 
-function handle_num_fsm([event, char], { expr, fsm }) {
-   const action = fsm.accept(event);
-   let status = ok(char);
-   switch (action) {
-      case "add_char":
-         expr.add_char(char);
-         break;
-      default:
-         status = error(char);
-         break;
-   }
-   return status;
-}
-
-function ok(result) {
-   return ["ok", result];
-}
-function error(reason) {
-   return ["error", reason];
-}
+console.log(calc_expr("1+2="));
