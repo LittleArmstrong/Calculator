@@ -1,6 +1,60 @@
 import { $ } from "./toolbox.mjs";
+/**
+ * Bind the events to the calculator buttons and call the corresponding function
+ * for the evaluation of the input value
+ */
+function bind_events() {
+   // textfield where the input and calculation is shown
+   const display = $("#display");
+   // accepted input buttons
+   const char_inputs = [
+      { key: "0", id: "#num0", value: "0" },
+      { key: "1", id: "#num1", value: "1" },
+      { key: "2", id: "#num2", value: "2" },
+      { key: "3", id: "#num3", value: "3" },
+      { key: "4", id: "#num4", value: "4" },
+      { key: "5", id: "#num5", value: "5" },
+      { key: "6", id: "#num6", value: "6" },
+      { key: "7", id: "#num7", value: "7" },
+      { key: "8", id: "#num8", value: "8" },
+      { key: "9", id: "#num9", value: "9" },
+      { key: "-", id: "#sub", value: "-" },
+      { key: "+", id: "#add", value: "+" },
+      { key: "*", id: "#mul", value: "*" },
+      { key: "/", id: "#div", value: "/" },
+      { key: ".", id: "#dot", value: "." },
+      { key: "Enter=", id: "#eq", value: "=" },
+      { key: "Delete", id: "#ac", value: "a" },
+   ];
 
-const events = [
+   // bind calc function to the input buttons
+   char_inputs.forEach((input) => {
+      $(input.id).addEventListener("click", () => {
+         display.value = handle_input(input.value);
+      });
+   });
+
+   //simulate clicking the buttons with keypresses (keyup)
+   document.onkeyup = (event) => {
+      char_inputs.some((input) => {
+         if (input.key.includes(event.key)) {
+            $(input.id).click();
+            return true;
+         }
+      });
+   };
+}
+
+/**
+ * Groups certain characters and gives them an event name
+ * @typedef {[{name: String, regex: Regex}]} char_events
+ */
+
+/**
+ * Define the characters that count as an event
+ * @type {char_events}
+ */
+const defined_events = [
    { name: "num", regex: /\d/ },
    { name: "del", regex: /d/ },
    { name: "ac", regex: /a/ },
@@ -11,185 +65,38 @@ const events = [
    { name: "base", regex: /e/ },
 ];
 
-const num_fsm = {
-   transitions: {
-      init: {
-         minus: ["num_sign", "add_char"],
-         num: ["int", "add_char"],
-      },
-      num_sign: {
-         num: ["int", "add_char"],
-      },
-      int: {
-         num: ["int", "add_char"],
-         minus: ["initial", "as_op"],
-         dot: ["float", "add_char"],
-         base: ["base", "add_char"],
-      },
-      float: {
-         num: ["float", "add_char"],
-         minus: ["initial", "as_op"],
-      },
-      base: { minus: ["exp_sign", "add_char"], num: ["exp", "add_char"] },
-      exp_sign: {
-         num: ["exp", "add_char"],
-      },
-      exp: {
-         num: ["exp", "add_char"],
-         minus: ["initial", "as_op"],
-      },
-   },
-   init_state: "init",
-   state: "init",
-   def_event: "def",
-   def_action: "ignore",
-   tstates: ["int", "float", "exp"],
+// save the current expression
+let curr_expr = "";
 
-   accept(event) {
-      const [next_state, action] = this.transitions[this.state][event] ||
-         this.transitions[this.state][this.def_event] || [this.state, this.def_action];
-      this.state = next_state;
-      return action;
-   },
+// evaluates the chars and current expression to create a math expression
+// and calculate it
+function handle_input(str) {
+   const chars = str.split("");
+   let event = "";
+   chars.forEach((char) => {
+      event = get_char_event(char, defined_events);
+      console.log(event);
+      curr_expr += event ? char : "";
+   });
 
-   reset() {
-      this.state = this.init_state;
-   },
-
-   is_tstate(state) {
-      return this.tstates.includes(state);
-   },
-};
-
-const expr_nfsm = {
-   init_state: "init",
-   state: "init",
-   def_FSMs: [],
-   def_event: "def",
-   def_action: "ignore",
-   FSMs: { num: num_fsm },
-   transitions: {
-      init: {
-         op: {
-            FSMs: ["num"],
-            action: "next_num",
-            next: "next_num",
-         },
-         def: { FSMs: [], action: "call_num_fsm", next: "init" },
-      },
-      next_num: {
-         op: {
-            FSMs: ["num"],
-            action: "calc_next",
-            next: "next_num",
-         },
-         eq: {
-            FSMs: ["num"],
-            action: "calc",
-            next: "next_num",
-         },
-         def: {
-            FSMs: ["num"],
-            action: "call_num_fsm",
-            next: "next_num",
-         },
-      },
-   },
-   accept(event) {
-      let { FSMs, action, next } = this.transitions[this.state][event] ||
-         this.transitions[this.state][this.def_event] || [
-            this.def_FSMs,
-            this.def_action,
-            this.state,
-         ];
-      console.log(FSMs);
-      if (!FSMs.every((FSM) => this.FSMs[FSM].is_tstate())) {
-         action = this.def_action;
-      } else {
-         this.state = next;
-      }
-      return action;
-   },
-   reset() {
-      this.state = this.init_state;
-   },
-};
-
-function calc_expr(str) {
-   const stream = parse_expr(str, events);
-   const expr = handle_stream(stream, expr_nfsm);
-   return expr;
+   return curr_expr;
 }
 
 /**
- * Parses the string expression and creates an event stream based on the given events
- *
- * @param {String} str                               The expression to be parsed
- * @param {{event:String, regex: RegExp}[]} events   An Array of the events and the corresponding regex the expr should contain
- * @returns {[string, String][]}                     an event stream with the event and corresponding char
+ * Checks if the char matches one of the given events
+ * @param {String} char                               The char to be checked
+ * @param {{event:String, regex: RegExp}[]} events    An Array of the events and the corresponding regex the expr should contain
+ * @returns {string}                                  the event stream of the corresponding char
  */
-function parse_expr(str, events) {
-   const chars = str.split("");
-   const stream = [];
-   chars.forEach((char) => {
-      events.some((event) => {
-         return event.regex.test(char) ? stream.push([event.name, char]) : false;
-      });
-   });
-   return stream;
-}
-
-const event_stream = {
-   get: [],
-   push([event, char], ...rest) {
-      const new_length = this.stream.push([event, char], ...rest);
-      return new_length;
-   },
-   shift() {
-      return this.stream.shift();
-   },
-   unshift([event, char], ...rest) {
-      return this.stream.unshift([event, char], ...rest);
-   },
-};
-
-function handle_stream(event_stream, nfsm) {
-   let expr = ""; // new valid expr to return
-   const stream = [...event_stream]; // the events to work through
-   const actions = []; // the actions caused from one event to work through
-   console.table(stream);
-   while (stream.length !== 0) {
-      //check which action to take depending on the state and event
-      let [event, char] = stream.shift();
-      actions.push(nfsm.accept(event));
-      //execute the action
-      while (actions.length !== 0) {
-         let action = actions.shift();
-         switch (action) {
-            case "ignore":
-               break;
-            case "add_char":
-               expr += char;
-               break;
-            case "call_num_fsm": // create valid num with fsm
-               actions.push(nfsm.fsms.num.accept(event));
-               break;
-            case "next_num":
-               nfsm.fsms.num.reset();
-               actions.push("add_char");
-               break;
-            case "calc": // calculate the result of expr
-               console.log("calc");
-               //calculate expr
-               break; //here
-            case "calc_next": // calculate the expr and add the chosen operator
-               //calculate and add char op/create event
-               console.log("calc_next");
-               break;
-         }
+function get_char_event(char, events) {
+   let char_event = "";
+   events.some((event) => {
+      if (event.regex.test(char)) {
+         char_event = event.name;
+         return true;
       }
-   }
-   return expr;
+   });
+   return char_event;
 }
 
-console.log(calc_expr("1+2="));
+bind_events();
