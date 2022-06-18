@@ -73,10 +73,11 @@ let curr_expr = "";
 function handle_input(str) {
    const chars = str.split("");
    let event = "";
+   let action = "";
    chars.forEach((char) => {
       event = get_char_event(char, defined_events);
-      console.log(event);
-      curr_expr += event ? char : "";
+      action = num_fsm.accept(event);
+      curr_expr = exe_action(action, char, curr_expr);
    });
 
    return curr_expr;
@@ -84,9 +85,9 @@ function handle_input(str) {
 
 /**
  * Checks if the char matches one of the given events
- * @param {String} char                               The char to be checked
- * @param {{event:String, regex: RegExp}[]} events    An Array of the events and the corresponding regex the expr should contain
- * @returns {string}                                  the event stream of the corresponding char
+ * @param {String} char           The char to be checked
+ * @param {char_events} events    An Array of the events and the corresponding regex the expr should contain
+ * @returns {string}              the event stream of the corresponding char
  */
 function get_char_event(char, events) {
    let char_event = "";
@@ -99,4 +100,91 @@ function get_char_event(char, events) {
    return char_event;
 }
 
+/**
+ * A finite state machine
+ * @typedef  {object}                                          FSM
+ * @property {{state_1:
+ *    {event_1: [next_state:string, action: string]}}}         transitions       The accepted events in a state, the next state and following action
+ * @property {string}                                          init_state        The initial / beginning state of the FSM
+ * @property {string}                                          state             The actual state of the FSM
+ * @property {string}                                          def_event         Default event in case other events aren't valid
+ * @property {string}                                          def_action        Defeault action in case there is no default event accepted
+ * @property {string[]}                                        tstates           Includes transition states where the created value is in a valid state
+ * @property {function(string):string}                         accept            Accepts an event, possibly changes its state and returns an action
+ * @property {function():undefined}                            reset             Sets the current state to the initial state
+ * @property {function():bool}                                 is_tstate         Checks if the current state is a transition state
+ */
+
+/**
+ * An FSM for creating a number
+ * @type {FSM}
+ */
+
+const num_fsm = {
+   transitions: {
+      init: {
+         minus: ["num_sign", "add_char"],
+         num: ["int", "add_char"],
+      },
+      num_sign: {
+         num: ["int", "add_char"],
+      },
+      int: {
+         num: ["int", "add_char"],
+         minus: ["init", "as_op"],
+         dot: ["float", "add_char"],
+         base: ["base", "add_char"],
+      },
+      float: {
+         num: ["float", "add_char"],
+         minus: ["init", "as_op"],
+      },
+      base: { minus: ["exp_sign", "add_char"], num: ["exp", "add_char"] },
+      exp_sign: {
+         num: ["exp", "add_char"],
+      },
+      exp: {
+         num: ["exp", "add_char"],
+         minus: ["init", "as_op"],
+      },
+   },
+   init_state: "init",
+   state: "init",
+   def_event: "def",
+   def_action: "ignore",
+   tstates: ["int", "float", "exp"],
+
+   accept(event) {
+      console.log(event, this.state);
+      const [next_state, action] = this.transitions[this.state][event] ||
+         this.transitions[this.state][this.def_event] || [this.state, this.def_action];
+      this.state = next_state;
+      return action;
+   },
+
+   reset() {
+      this.state = this.init_state;
+   },
+
+   is_tstate() {
+      return this.tstates.includes(this.state);
+   },
+};
+
+// execute the given action
+function exe_action(action, char, expression) {
+   let expr = expression;
+   switch (action) {
+      case "ignore":
+         break;
+      case "add_char":
+         expr += char;
+         break;
+      default:
+         console.log("No such case:", action);
+   }
+   return expr;
+}
+
+//main
 bind_events();
