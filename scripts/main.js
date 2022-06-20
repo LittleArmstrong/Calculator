@@ -101,6 +101,37 @@ function init_calculator() {
       },
    };
 
+   const op_fsm = {
+      transitions: {
+         init: {
+            op: ["num", "add_char"],
+         },
+         num: {
+            op: ["num", "calc_next"],
+            eq: ["num", "calc"],
+         },
+      },
+      state: "init",
+      init_state: "init",
+      def_event: "def",
+      def_action: "ignore",
+
+      accept(event) {
+         return (
+            this.transitions[this.state][event] ??
+            this.transitions[this.state][this.def_event] ?? [this.state, this.def_action]
+         );
+      },
+
+      set_state(state) {
+         this.state = state;
+      },
+
+      reset_state() {
+         this.state = this.init_state;
+      },
+   };
+
    // bind calc function to the input buttons
    num_inputs.forEach((input) => {
       $(input.id).addEventListener("click", () => {
@@ -119,6 +150,15 @@ function init_calculator() {
    op_inputs.forEach((input) => {
       $(input.id).addEventListener("click", () => {
          //function for ops
+         const event = get_char_event(input.value);
+         const [next_state, action] = op_fsm.accept(event);
+         const expr = execute_action({
+            action: action,
+            char: input.value,
+            expr: display.value,
+         });
+         display.value = expr;
+         op_fsm.set_state(next_state);
       });
    });
 
@@ -168,10 +208,66 @@ function execute_action({ action, char, expr }) {
       case "add_char":
          new_expr += char;
          break;
+      case "calc":
+         new_expr = calc_expr(new_expr);
+         break;
+
+      case "calc_next":
+         new_expr = calc_expr + char;
+         break;
       default:
          console.log("No such case:", action);
    }
    return new_expr;
+}
+
+function calc_expr(expr) {
+   let [numbers, operator] = parse_math_expr(expr);
+   let result = null;
+   switch (operator) {
+      case "+":
+         result = add(numbers);
+         break;
+      case "-":
+         result = sub(numbers);
+         break;
+      case "*":
+         result = mul(numbers);
+         break;
+      case "/":
+         result = div(numbers);
+         break;
+      default:
+         return error(`No such case: "${operator}"`);
+   }
+   return Number.isFinite(result) ? result : "NaN";
+}
+
+function parse_math_expr(expr) {
+   //first regex matches first number (with sign if present) and second matches second number (with sign if preceded by an operator)
+   //converts the strings tu numbers
+   const numbers = expr
+      .match(/^-?\d*\.?\d+(?:e[-+]?\d+)?|(?<=[-+*/])-?\d*\.?\d+(?:e[-+]?\d+)?/g)
+      .map(Number);
+   // takes the first operator that is preceded by a number
+   const operator = expr.match(/(?<=\d.?)[-+*\/]/)[0];
+   return [numbers, operator];
+}
+
+function add([num1, num2]) {
+   return num1 + num2;
+}
+
+function sub([num1, num2]) {
+   return num1 - num2;
+}
+
+function mul([num1, num2]) {
+   return num1 * num2;
+}
+
+function div([num1, num2]) {
+   return num1 / num2;
 }
 
 //main
