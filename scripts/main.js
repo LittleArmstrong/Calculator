@@ -1,26 +1,11 @@
 import { $ } from "./toolbox.mjs";
-/**
- * A finite state machine
- * @typedef  {object}                                          FSM
- * @property {{state_1:
- *    {event_1: [next_state:string, action: string]}}}         transitions       The accepted events in a state, the next state and following action
- * @property {string}                                          init_state        The initial / beginning state of the FSM
- * @property {string}                                          state             The actual state of the FSM
- * @property {string}                                          def_event         Default event in case other events aren't valid
- * @property {string}                                          def_action        Defeault action in case there is no default event accepted
- * @property {string[]}                                        tstates           Includes transition states where the created value is in a valid state
- * @property {function(string):string}                         accept            Accepts an event, possibly changes its state and returns an action
- * @property {function():bool}                                 is_tstate         Checks if the current state is a transition state
- * @property {function(string):undefined}                      set_state         Sets the current state to the given state
- * @property {function():undefined}                            reset             Sets the current state to the initial state
- */
 
 /**
  * Bind the inputs and events with the functions
  */
 function init_calculator() {
    const display = $("#display"); // textfield where the input and calculation is shown
-   const num_inputs = [
+   const char_inputs = [
       // input for creating valid nums
       { key: "0", id: "#num0", value: "0" },
       { key: "1", id: "#num1", value: "1" },
@@ -34,106 +19,15 @@ function init_calculator() {
       { key: "9", id: "#num9", value: "9" },
       { key: "-", id: "#sub", value: "-" }, //for sign
       { key: ".", id: "#dot", value: "." },
-   ];
-   const op_inputs = [
-      //inputs for the operation
-      { key: "-", id: "#sub", value: "-" },
       { key: "+", id: "#add", value: "+" },
       { key: "*", id: "#mul", value: "*" },
       { key: "/", id: "#div", value: "/" },
       { key: "Enter=", id: "#eq", value: "=" },
+      { key: "Delete", id: "#ac", value: "a" },
    ];
 
-   const del_inputs = [{ key: "Delete", id: "#ac", value: "a" }]; //inputs for deletion
-
-   /**
-    * An FSM for creating a number
-    * @type {FSM}
-    */
-   const num_fsm = {
-      transitions: {
-         init: {
-            minus: ["num_sign", "add_char"],
-            num: ["int", "add_char"],
-         },
-         num_sign: {
-            num: ["int", "add_char"],
-         },
-         int: {
-            num: ["int", "add_char"],
-            dot: ["float", "add_char"],
-            base: ["base", "add_char"],
-         },
-         float: {
-            num: ["float", "add_char"],
-         },
-         base: { minus: ["exp_sign", "add_char"], num: ["exp", "add_char"] },
-         exp_sign: {
-            num: ["exp", "add_char"],
-         },
-         exp: {
-            num: ["exp", "add_char"],
-         },
-      },
-      state: "init",
-      init_state: "init",
-      def_event: "def",
-      def_action: "ignore",
-      tstates: ["int", "float", "exp"],
-
-      accept(event) {
-         return (
-            this.transitions[this.state][event] ??
-            this.transitions[this.state][this.def_event] ?? [this.state, this.def_action]
-         );
-      },
-
-      is_tstate(state) {
-         return this.tstates.includes(state);
-      },
-
-      set_state(state) {
-         this.state = state;
-      },
-
-      reset_state() {
-         this.state = this.init_state;
-      },
-   };
-
-   const op_fsm = {
-      transitions: {
-         init: {
-            op: ["num", "add_char"],
-         },
-         num: {
-            op: ["num", "calc_next"],
-            eq: ["num", "calc"],
-         },
-      },
-      state: "init",
-      init_state: "init",
-      def_event: "def",
-      def_action: "ignore",
-
-      accept(event) {
-         return (
-            this.transitions[this.state][event] ??
-            this.transitions[this.state][this.def_event] ?? [this.state, this.def_action]
-         );
-      },
-
-      set_state(state) {
-         this.state = state;
-      },
-
-      reset_state() {
-         this.state = this.init_state;
-      },
-   };
-
    // bind calc function to the input buttons
-   num_inputs.forEach((input) => {
+   char_inputs.forEach((input) => {
       $(input.id).addEventListener("click", () => {
          const event = get_char_event(input.value);
          const [next_state, action] = num_fsm.accept(event);
@@ -147,36 +41,108 @@ function init_calculator() {
       });
    });
 
-   op_inputs.forEach((input) => {
-      $(input.id).addEventListener("click", () => {
-         //function for ops
-         const event = get_char_event(input.value);
-         const [next_state, action] = op_fsm.accept(event);
-         const expr = execute_action({
-            action: action,
-            char: input.value,
-            expr: display.value,
-         });
-         display.value = expr;
-         op_fsm.set_state(next_state);
-      });
-   });
-
    //simulate clicking the buttons with keypresses (keyup)
    document.onkeyup = (event) => {
-      num_inputs.some((input) => {
-         if (input.key.includes(event.key)) {
-            $(input.id).click();
-            return true;
-         }
-      });
-      op_inputs.some((input) => {
+      char_inputs.some((input) => {
          if (input.key.includes(event.key)) {
             $(input.id).click();
             return true;
          }
       });
    };
+}
+
+function handle_math_expression({ char, expression, num_state, supv_state }) {
+   const char_event = get_char_event(char);
+
+   const num_fsm = {
+      accept(event, state) {
+         const transitions = {
+            init: {
+               minus: ["num_sign", "add_char"],
+               num: ["int", "add_char"],
+            },
+            num_sign: {
+               num: ["int", "add_char"],
+            },
+            int: {
+               num: ["int", "add_char"],
+               dot: ["float", "add_char"],
+               base: ["base", "add_char"],
+            },
+            float: {
+               num: ["float", "add_char"],
+            },
+            base: {
+               minus: ["exp_sign", "add_char"],
+               num: ["exp", "add_char"],
+            },
+            exp_sign: {
+               num: ["exp", "add_char"],
+            },
+            exp: {
+               num: ["exp", "add_char"],
+            },
+         };
+         const def_event = "def";
+         const def_action = "ignore";
+         return transitions[state][event] ?? transitions[state][def_event] ?? [state, def_action];
+      },
+
+      is_tstate(state) {
+         const tstates = ["int", "float", "exp"];
+         return tstates.includes(state);
+      },
+
+      is_sign_state(state) {
+         const sign_states = ["init", "base"];
+         return sign_states.includes(state);
+      },
+
+      get_init_state() {
+         const init_state = "init";
+         return init_state;
+      },
+   };
+
+   const supv_fsm = {
+      accept(event, state) {
+         const transitions = {
+            init: {
+               num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+               minus: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            },
+            first_num: {
+               num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+               minus: [
+                  { condition: num_fsm.is_sign_state, step: ["call_num_fsm", "first_num"] },
+                  { condition: num_fsm.is_tstate, step: ["next_num", "second_num"] },
+               ],
+               dot: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+               op: [{ condition: num_fsm.is_tstate, step: ["next_num", "second_num"] }],
+            },
+            second_num: {
+               num: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+               minus: [
+                  { condition: num_fsm.is_sign_state, step: ["call_num_fsm", "second_num"] },
+                  { condition: num_fsm.is_tstate, step: ["calc_next", "second_num"] },
+               ],
+               dot: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+               op: [{ condition: num_fsm.is_tstate, step: ["calc_next", "second_num"] }],
+               eq: [{ condition: num_fsm.is_tstate, step: ["calc", "calc_num"] }],
+            },
+            calc_num: {
+               num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+               minus: [{ condition: num_fsm.is_tstate, step: ["calc_next", "second_num"] }],
+               op: [{ condition: num_fsm.is_tstate, step: ["calc_next", "second_num"] }],
+            },
+         };
+         const def_step = [{ condition: true, step: ["ignore", state] }];
+         return transitions[state][event] ?? transitions[state][def_event] ?? def_step;
+      },
+   };
+
+   //returns new expr and states
 }
 
 /**
@@ -195,8 +161,17 @@ function get_char_event(char) {
       { name: "eq", regex: /=/ },
       { name: "base", regex: /e/ },
    ];
-   const event = char_events.find((e) => e.regex.test(char));
+   const event = char_events.find((event) => event.regex.test(char));
    return event?.name ?? "";
+}
+
+function get_next_step({ event, state, nfsm }) {
+   const def_action = "ignore";
+   const def_state = state;
+   const next = nfsm
+      .accept(event, state)
+      .find((step) => (typeof step.condition === "function" ? step.condition() : step.condition));
+   return next.step;
 }
 
 // execute the given action
