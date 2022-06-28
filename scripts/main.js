@@ -54,96 +54,144 @@ function init_calculator() {
 
 function handle_math_expression({ char, expression, num_state, supv_state }) {
    const char_event = get_char_event(char);
+   const [action, next_supv_state] = supv_fsm.accept({
+      event: char_event,
+      state: supv_state,
+      num_state: num_state,
+   });
+   const [new_expression, next_num_state] = execute_action({
+      action: action,
+      char: char,
+      expr: expression,
+   });
 
-   const num_fsm = {
-      accept(event, state) {
-         const transitions = {
-            init: {
-               minus: ["num_sign", "add_char"],
-               num: ["int", "add_char"],
-            },
-            num_sign: {
-               num: ["int", "add_char"],
-            },
-            int: {
-               num: ["int", "add_char"],
-               dot: ["float", "add_char"],
-               base: ["base", "add_char"],
-            },
-            float: {
-               num: ["float", "add_char"],
-            },
-            base: {
-               minus: ["exp_sign", "add_char"],
-               num: ["exp", "add_char"],
-            },
-            exp_sign: {
-               num: ["exp", "add_char"],
-            },
-            exp: {
-               num: ["exp", "add_char"],
-            },
-         };
-         const def_event = "def";
-         const def_action = "ignore";
-         return transitions[state][event] ?? transitions[state][def_event] ?? [state, def_action];
-      },
-
-      is_tstate(state) {
-         const tstates = ["int", "float", "exp"];
-         return tstates.includes(state);
-      },
-
-      is_sign_state(state) {
-         const sign_states = ["init", "base"];
-         return sign_states.includes(state);
-      },
-
-      get_init_state() {
-         const init_state = "init";
-         return init_state;
-      },
-   };
-
-   const supv_fsm = {
-      accept(event, state) {
-         const transitions = {
-            init: {
-               num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
-               minus: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
-            },
-            first_num: {
-               num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
-               minus: [
-                  { condition: num_fsm.is_sign_state, step: ["call_num_fsm", "first_num"] },
-                  { condition: num_fsm.is_tstate, step: ["next_num", "second_num"] },
-               ],
-               dot: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
-               op: [{ condition: num_fsm.is_tstate, step: ["next_num", "second_num"] }],
-            },
-            second_num: {
-               num: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
-               minus: [
-                  { condition: num_fsm.is_sign_state, step: ["call_num_fsm", "second_num"] },
-                  { condition: num_fsm.is_tstate, step: ["calc_next", "second_num"] },
-               ],
-               dot: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
-               op: [{ condition: num_fsm.is_tstate, step: ["calc_next", "second_num"] }],
-               eq: [{ condition: num_fsm.is_tstate, step: ["calc", "calc_num"] }],
-            },
-            calc_num: {
-               num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
-               minus: [{ condition: num_fsm.is_tstate, step: ["calc_next", "second_num"] }],
-               op: [{ condition: num_fsm.is_tstate, step: ["calc_next", "second_num"] }],
-            },
-         };
-         const def_step = [{ condition: true, step: ["ignore", state] }];
-         return transitions[state][event] ?? transitions[state][def_event] ?? def_step;
-      },
-   };
+   return { expr: new_expression, supv_state: next_supv_state, num_state: next_num_state };
 
    //returns new expr and states
 }
+
+const num_fsm = {
+   accept(event, state) {
+      const transitions = {
+         init: {
+            minus: ["num_sign", "add_char"],
+            num: ["int", "add_char"],
+         },
+         num_sign: {
+            num: ["int", "add_char"],
+         },
+         int: {
+            num: ["int", "add_char"],
+            dot: ["float", "add_char"],
+            base: ["base", "add_char"],
+         },
+         float: {
+            num: ["float", "add_char"],
+         },
+         base: {
+            minus: ["exp_sign", "add_char"],
+            num: ["exp", "add_char"],
+         },
+         exp_sign: {
+            num: ["exp", "add_char"],
+         },
+         exp: {
+            num: ["exp", "add_char"],
+         },
+      };
+      const def_event = "def";
+      const def_action = "ignore";
+      return transitions[state][event] ?? transitions[state][def_event] ?? [state, def_action];
+   },
+
+   is_tstate(state) {
+      const tstates = ["int", "float", "exp"];
+      return tstates.includes(state);
+   },
+
+   is_sign_state(state) {
+      const sign_states = ["init", "base"];
+      return sign_states.includes(state);
+   },
+
+   get_init_state() {
+      const init_state = "init";
+      return init_state;
+   },
+};
+
+const supv_fsm = {
+   accept({ event, state, num_state }) {
+      const transitions = {
+         init: {
+            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            minus: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+         },
+         first_num: {
+            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            minus: [
+               {
+                  condition: () => num_fsm.is_sign_state(num_state),
+                  step: ["call_num_fsm", "first_num"],
+               },
+               {
+                  condition: () => num_fsm.is_tstate(num_state),
+                  step: ["next_num", "second_num"],
+               },
+            ],
+            dot: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            op: [
+               {
+                  condition: () => num_fsm.is_tstate(num_state),
+                  step: ["next_num", "second_num"],
+               },
+            ],
+         },
+         second_num: {
+            num: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+            minus: [
+               {
+                  condition: () => num_fsm.is_sign_state(num_state),
+                  step: ["call_num_fsm", "second_num"],
+               },
+               {
+                  condition: () => num_fsm.is_tstate(num_state),
+                  step: ["calc_next", "second_num"],
+               },
+            ],
+            dot: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+            op: [
+               {
+                  condition: () => num_fsm.is_tstate(num_state),
+                  step: ["calc_next", "second_num"],
+               },
+            ],
+            eq: [{ condition: () => num_fsm.is_tstate(num_state), step: ["calc", "calc_num"] }],
+         },
+         calc_num: {
+            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            minus: [
+               {
+                  condition: () => num_fsm.is_tstate(num_state),
+                  step: ["calc_next", "second_num"],
+               },
+            ],
+            op: [
+               {
+                  condition: () => num_fsm.is_tstate(num_state),
+                  step: ["calc_next", "second_num"],
+               },
+            ],
+         },
+      };
+      const def_step = ["ignore", state];
+      const def_event = [{ condition: true, step: def_step }];
+      const next = (transitions[state][event] ?? transitions[state][def_event] ?? def_event).find(
+         (step) => (typeof step.condition === "function" ? step.condition() : step.condition)
+      );
+      return next?.step ?? def_step;
+   },
+};
 
 /**
  * Checks if the char matches one of the given events
@@ -165,33 +213,35 @@ function get_char_event(char) {
    return event?.name ?? "";
 }
 
-function get_next_step({ event, state, nfsm }) {
-   const def_action = "ignore";
-   const def_state = state;
-   const next = nfsm
-      .accept(event, state)
-      .find((step) => (typeof step.condition === "function" ? step.condition() : step.condition));
-   return next.step;
-}
-
 // execute the given action
 function execute_action({ action, char, expr }) {
-   let new_expr = expr;
-   switch (action) {
-      case "ignore":
-         break;
-      case "add_char":
-         new_expr += char;
-         break;
-      case "calc":
-         new_expr = calc_expr(new_expr);
-         break;
+   const actions = [action];
 
-      case "calc_next":
-         new_expr = calc_expr + char;
-         break;
-      default:
-         console.log("No such case:", action);
+   let new_expr = expr;
+   while (actions.length !== 0) {
+      let curr_action = actions.shift();
+      switch (curr_action) {
+         case "ignore":
+            break;
+         case "add_char":
+            new_expr += char;
+            break;
+         case "call_num_fsm":
+            //action here
+            break;
+         case "next_num":
+            //action
+            break;
+         case "calc":
+            new_expr = calc_expr(new_expr);
+            break;
+
+         case "calc_next":
+            new_expr = calc_expr + char;
+            break;
+         default:
+            console.log("No such case:", action);
+      }
    }
    return new_expr;
 }
@@ -247,3 +297,11 @@ function div([num1, num2]) {
 
 //main
 init_calculator();
+console.log(
+   handle_math_expression({
+      char: "-",
+      expression: "",
+      num_state: "int",
+      supv_state: "first_num",
+   })
+);
