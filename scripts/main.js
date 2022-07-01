@@ -65,7 +65,7 @@ function handle_math_expression({ chars, expr, num_state, supv_state }) {
       [action, next_supv_state] = supv_fsm.accept({
          event: char_event,
          state: next_supv_state,
-         num_state: num_state,
+         num_state: next_num_state,
       });
       actions.push(action);
 
@@ -91,7 +91,7 @@ function handle_math_expression({ chars, expr, num_state, supv_state }) {
                break;
 
             case "calc_next":
-               new_expr = calc_expr + char;
+               new_expr = calc_expr(new_expr) + char;
                next_num_state = num_fsm.init_state;
                break;
             default:
@@ -148,7 +148,7 @@ const num_fsm = {
       return sign_states.includes(state);
    },
 
-   get_init_state() {
+   get init_state() {
       const init_state = "init";
       return init_state;
    },
@@ -299,13 +299,13 @@ function div([num1, num2]) {
 //main
 init_calculator();
 
-let supv_state = "init";
-let num_state = "init";
+let supv_state = "first_num";
+let num_state = "float";
 let expr = "";
 
 [expr, supv_state, num_state] = handle_math_expression({
-   chars: "--123..45--.789.9.90",
-   expr: display.value,
+   chars: "--+93=",
+   expr: "-1.45",
    num_state: num_state,
    supv_state: supv_state,
 });
