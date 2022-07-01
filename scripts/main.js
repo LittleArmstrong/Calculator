@@ -25,19 +25,18 @@ function init_calculator() {
       { key: "Enter=", id: "#eq", value: "=" },
       { key: "Delete", id: "#ac", value: "a" },
    ];
+   let supv_state = "init";
+   let num_state = "init";
 
    // bind calc function to the input buttons
    char_inputs.forEach((input) => {
       $(input.id).addEventListener("click", () => {
-         const event = get_char_event(input.value);
-         const [next_state, action] = num_fsm.accept(event);
-         const expr = execute_action({
-            action: action,
-            char: input.value,
-            expr: display.value,
+         [display.value, supv_state, num_state] = handle_math_expression({
+            chars: input.value,
+            expression: display.value,
+            num_state: num_state,
+            supv_state: supv_state,
          });
-         display.value = expr;
-         num_fsm.set_state(next_state);
       });
    });
 
@@ -52,20 +51,55 @@ function init_calculator() {
    };
 }
 
-function handle_math_expression({ char, expression, num_state, supv_state }) {
-   const char_event = get_char_event(char);
-   const [action, next_supv_state] = supv_fsm.accept({
-      event: char_event,
-      state: supv_state,
-      num_state: num_state,
-   });
-   const [new_expression, next_num_state] = execute_action({
-      action: action,
-      char: char,
-      expr: expression,
-   });
+function handle_math_expression({ chars, expr, num_state, supv_state }) {
+   let new_expr = expr;
+   let next_num_state = num_state;
+   let next_supv_state = supv_state;
+   const array_chars = chars.split("");
 
-   return { expr: new_expression, supv_state: next_supv_state, num_state: next_num_state };
+   while (array_chars.length !== 0) {
+      const actions = [];
+      let action = "";
+      let char = array_chars.shift();
+      let char_event = get_char_event(char);
+      [action, next_supv_state] = supv_fsm.accept({
+         event: char_event,
+         state: next_supv_state,
+         num_state: num_state,
+      });
+      actions.push(action);
+
+      while (actions.length !== 0) {
+         let curr_action = actions.shift();
+         switch (curr_action) {
+            case "ignore":
+               break;
+            case "add_char":
+               new_expr += char;
+               break;
+            case "call_num_fsm":
+               [next_num_state, action] = num_fsm.accept(char_event, next_num_state);
+               actions.unshift(action);
+               break;
+            case "next_num":
+               new_expr += char;
+               next_num_state = num_fsm.init_state;
+               break;
+            case "calc":
+               new_expr = calc_expr(new_expr);
+               next_num_state = num_fsm.init_state;
+               break;
+
+            case "calc_next":
+               new_expr = calc_expr + char;
+               next_num_state = num_fsm.init_state;
+               break;
+            default:
+               console.log("No such case:", action);
+         }
+      }
+   }
+   return [new_expr, next_supv_state, next_num_state];
 
    //returns new expr and states
 }
@@ -213,39 +247,6 @@ function get_char_event(char) {
    return event?.name ?? "";
 }
 
-// execute the given action
-function execute_action({ action, char, expr }) {
-   const actions = [action];
-
-   let new_expr = expr;
-   while (actions.length !== 0) {
-      let curr_action = actions.shift();
-      switch (curr_action) {
-         case "ignore":
-            break;
-         case "add_char":
-            new_expr += char;
-            break;
-         case "call_num_fsm":
-            //action here
-            break;
-         case "next_num":
-            //action
-            break;
-         case "calc":
-            new_expr = calc_expr(new_expr);
-            break;
-
-         case "calc_next":
-            new_expr = calc_expr + char;
-            break;
-         default:
-            console.log("No such case:", action);
-      }
-   }
-   return new_expr;
-}
-
 function calc_expr(expr) {
    let [numbers, operator] = parse_math_expr(expr);
    let result = null;
@@ -297,11 +298,16 @@ function div([num1, num2]) {
 
 //main
 init_calculator();
-console.log(
-   handle_math_expression({
-      char: "-",
-      expression: "",
-      num_state: "int",
-      supv_state: "first_num",
-   })
-);
+
+let supv_state = "init";
+let num_state = "init";
+let expr = "";
+
+[expr, supv_state, num_state] = handle_math_expression({
+   chars: "--123..45--.789.9.90",
+   expr: display.value,
+   num_state: num_state,
+   supv_state: supv_state,
+});
+
+console.log(expr, num_state, supv_state);
