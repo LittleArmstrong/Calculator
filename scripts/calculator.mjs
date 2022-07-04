@@ -1,4 +1,15 @@
+/**
+ * Takes an input of chars, validates it and if applicable, evaluates it then returns it
+ * @param {string} chars String of chars input to be evaluated
+ * @param {object} settings Settings
+ * @param {string} settings.expr Previous validated expression
+ * @param {string} settings.num_state Current number FSM state
+ * @param {string} settings.supv_state Current supervisor state
+ * @returns a validated and evaluated expression
+ */
+
 export function calculate(chars, { expr = "", num_state = "init", supv_state = "init" } = {}) {
+   // run expr through calculate again to get states?
    let new_expr = expr;
    let next_num_state = num_state;
    let next_supv_state = supv_state;
@@ -51,6 +62,20 @@ export function calculate(chars, { expr = "", num_state = "init", supv_state = "
    //returns new expr and states
 }
 
+/**
+ * A finite state machine
+ * @typedef Num_FSM
+ * @type {object}
+ * @property {string} init_state - The initial state
+ * @property {function(string, string):[string, string]} accept Returns the next action and state depending on the received event and state
+ * @property {function(string):boolean} is_tstate Checks if the given state is a valid transitional state
+ * @property {function(string):boolean} is_sign_state Checks if the given state accepts the minus char as a sign
+ */
+
+/**
+ * An FSM for generating valid numbers
+ * @type {Num_FSM}
+ */
 const num_fsm = {
    accept(event, state) {
       const transitions = {
@@ -100,6 +125,18 @@ const num_fsm = {
       return init_state;
    },
 };
+
+/**
+ * A non determinisitic finite state machine to create valid math expression.s
+ * @typedef Supv_NFSM
+ * @type {object}
+ * @property {function({event:string, state:string, num_state: string}):[string, string]} accept Returns the next action and state depending on the received event and state
+ */
+
+/**
+ * An NFSM for generating valid math expressions
+ * @type {Supv_NFSM}
+ */
 
 const supv_fsm = {
    accept({ event, state, num_state }) {
@@ -194,6 +231,12 @@ function get_char_event(char) {
    return event?.name ?? "";
 }
 
+/**
+ * Takes a mathematical expression and calculates the result
+ *
+ * @param {string} expr The math expression to be calculated
+ * @returns {string} the result or ERR if there was an error
+ */
 function calc_expr(expr) {
    let [numbers, operator] = parse_math_expr(expr);
    let result = null;
@@ -213,8 +256,14 @@ function calc_expr(expr) {
       default:
          return error(`No such case: "${operator}"`);
    }
-   return Number.isFinite(result) ? result : "NaN";
+   return Number.isFinite(result) ? result : "ERR";
 }
+
+/**
+ * Parses a string expression for numbers and operators
+ * @param {String} expr The math expression to be parsed
+ * @returns the numbers and operator extracted from the expression
+ */
 
 function parse_math_expr(expr) {
    //first regex matches first number (with sign if present) and second matches second number (with sign if preceded by an operator)
@@ -227,17 +276,38 @@ function parse_math_expr(expr) {
    return [numbers, operator];
 }
 
+/**
+ * Adds two numbers together and returns the result
+ * @param {[number, number]} param0 Numbers for the addtiion
+ * @returns {number} the result
+ */
 function add([num1, num2]) {
    return num1 + num2;
 }
 
+/**
+ * Subtracts the second number from the first and returns the result
+ * @param {[number, number]} param0 Numbers for the subtraction
+ * @returns {number} the result
+ */
 function sub([num1, num2]) {
    return num1 - num2;
 }
 
+/**
+ * Multiplicates two numbers and returns the result
+ * @param {[number, number]} param0 Numbers for the multiplication
+ * @returns the result
+ */
 function mul([num1, num2]) {
    return num1 * num2;
 }
+
+/**
+ * Divides the first number with the second one and returns the result
+ * @param {[number, number]} param0 Numbers for the division
+ * @returns the result
+ */
 
 function div([num1, num2]) {
    return num1 / num2;
