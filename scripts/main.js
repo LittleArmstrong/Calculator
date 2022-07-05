@@ -28,15 +28,19 @@ import { calculate } from "./calculator.mjs";
    ];
    let supv_state = "init";
    let num_state = "init";
+   let log = [];
 
    // bind calc function to the input buttons
    char_inputs.forEach((input) => {
       $(input.id).addEventListener("click", () => {
-         [display.value, supv_state, num_state] = calculate(input.value, {
+         [display.value, supv_state, num_state, log] = calculate(input.value, {
             expr: display.value,
             num_state: num_state,
             supv_state: supv_state,
+            log: log,
          });
+         console.clear();
+         console.table(log);
       });
    });
 

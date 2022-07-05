@@ -8,12 +8,16 @@
  * @returns a validated and evaluated expression
  */
 
-export function calculate(chars, { expr = "", num_state = "init", supv_state = "init" } = {}) {
+export function calculate(
+   chars,
+   { expr = "", num_state = "init", supv_state = "init", log = [] } = {}
+) {
    // run expr through calculate again to get states?
    let new_expr = expr;
    let next_num_state = num_state;
    let next_supv_state = supv_state;
    const array_chars = chars.split("");
+   const new_log = log;
 
    while (array_chars.length !== 0) {
       const actions = [];
@@ -34,22 +38,28 @@ export function calculate(chars, { expr = "", num_state = "init", supv_state = "
                break;
             case "add_char":
                new_expr += char;
+               log.push({
+                  char: char,
+                  event: char_event,
+                  supv_state: supv_state,
+                  num_state: num_state,
+               });
                break;
             case "call_num_fsm":
                [next_num_state, action] = num_fsm.accept(char_event, next_num_state);
                actions.unshift(action);
                break;
             case "next_num":
-               new_expr += char;
                next_num_state = num_fsm.init_state;
+               actions.unshift("add_char");
                break;
             case "calc":
                new_expr = "" + calc_expr(new_expr);
                next_num_state = num_fsm.init_state;
+               log = [];
                break;
             case "calc_next":
-               new_expr = calc_expr(new_expr) + char;
-               next_num_state = num_fsm.init_state;
+               actions.unshift("calc", "add_char");
                break;
             case "clear_all":
                new_expr = "";
@@ -60,7 +70,7 @@ export function calculate(chars, { expr = "", num_state = "init", supv_state = "
          }
       }
    }
-   return [new_expr, next_supv_state, next_num_state];
+   return [new_expr, next_supv_state, next_num_state, log];
 
    //returns new expr and states
 }
