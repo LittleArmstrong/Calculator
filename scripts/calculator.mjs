@@ -47,9 +47,12 @@ export function calculate(chars, { expr = "", num_state = "init", supv_state = "
                new_expr = "" + calc_expr(new_expr);
                next_num_state = num_fsm.init_state;
                break;
-
             case "calc_next":
                new_expr = calc_expr(new_expr) + char;
+               next_num_state = num_fsm.init_state;
+               break;
+            case "clear_all":
+               new_expr = "";
                next_num_state = num_fsm.init_state;
                break;
             default:
@@ -142,11 +145,12 @@ const supv_fsm = {
    accept({ event, state, num_state }) {
       const transitions = {
          init: {
-            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
             minus: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
          },
          first_num: {
-            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            ac: [{ condition: true, step: ["clear_all", "init"] }],
+            dot: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
             minus: [
                {
                   condition: () => num_fsm.is_sign_state(num_state),
@@ -157,7 +161,7 @@ const supv_fsm = {
                   step: ["next_num", "second_num"],
                },
             ],
-            dot: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
             op: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
@@ -166,7 +170,9 @@ const supv_fsm = {
             ],
          },
          second_num: {
-            num: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+            ac: [{ condition: true, step: ["clear_all", "init"] }],
+            dot: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+            eq: [{ condition: () => num_fsm.is_tstate(num_state), step: ["calc", "calc_num"] }],
             minus: [
                {
                   condition: () => num_fsm.is_sign_state(num_state),
@@ -177,23 +183,23 @@ const supv_fsm = {
                   step: ["calc_next", "second_num"],
                },
             ],
-            dot: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+            num: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
             op: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
                   step: ["calc_next", "second_num"],
                },
             ],
-            eq: [{ condition: () => num_fsm.is_tstate(num_state), step: ["calc", "calc_num"] }],
          },
          calc_num: {
-            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            ac: [{ condition: true, step: ["clear_all", "init"] }],
             minus: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
                   step: ["calc_next", "second_num"],
                },
             ],
+            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
             op: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
