@@ -35,8 +35,10 @@ export function calculate(
          let curr_action = actions.shift();
          switch (curr_action) {
             case "ignore":
+               //do nothing
                break;
             case "add_char":
+               //add the inputted char to the expression and log this event
                new_expr += char;
                log.push({
                   char: char,
@@ -46,33 +48,41 @@ export function calculate(
                });
                break;
             case "call_num_fsm":
+               //call the num fsm to get the next action and state
                [next_num_state, action] = num_fsm.accept(char_event, next_num_state);
                actions.unshift(action);
                break;
             case "next_num":
+               //start the creation of the second number and add the operator
                next_num_state = num_fsm.init_state;
                actions.unshift("add_char");
                break;
             case "calc":
+               //calculate the expression and reset log and number creation
                new_expr = "" + calc_expr(new_expr);
                next_num_state = num_fsm.init_state;
                log = [];
                break;
             case "calc_next":
+               //combination of calculation the expression and adding the operator
                actions.unshift("calc", "add_char");
                break;
             case "clear_all":
+               //clear the expression and reset number creation fsm
                new_expr = "";
                next_num_state = num_fsm.init_state;
                break;
             case "del_char":
+               //delete the last char or if calculated the the calculated number
+               //depending on the log
                let last_event_log = log.pop();
                new_expr = last_event_log ? new_expr.slice(0, -1) : "";
                next_num_state = last_event_log?.num_state ?? next_num_state;
                next_supv_state = last_event_log?.supv_state ?? next_supv_state;
                break;
             default:
-               console.log("No such case:", action);
+               //show an error if there is no code for the given action
+               console.error("No such case:", action);
          }
       }
    }
