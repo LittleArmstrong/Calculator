@@ -25,6 +25,7 @@ import { calculate } from "./calculator.mjs";
       { key: "/", id: "#div", value: "/" },
       { key: "Enter=", id: "#eq", value: "=" },
       { key: "Delete", id: "#ac", value: "a" },
+      { key: "Backspace", id: "#del", value: "d" },
    ];
    let supv_state = "init";
    let num_state = "init";
@@ -39,8 +40,6 @@ import { calculate } from "./calculator.mjs";
             supv_state: supv_state,
             log: log,
          });
-         console.clear();
-         console.table(log);
       });
    });
 

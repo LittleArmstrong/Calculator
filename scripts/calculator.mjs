@@ -65,6 +65,12 @@ export function calculate(
                new_expr = "";
                next_num_state = num_fsm.init_state;
                break;
+            case "del_char":
+               let last_event_log = log.pop();
+               new_expr = last_event_log ? new_expr.slice(0, -1) : "";
+               next_num_state = last_event_log?.num_state ?? next_num_state;
+               next_supv_state = last_event_log?.supv_state ?? next_supv_state;
+               break;
             default:
                console.log("No such case:", action);
          }
@@ -160,6 +166,7 @@ const supv_fsm = {
          },
          first_num: {
             ac: [{ condition: true, step: ["clear_all", "init"] }],
+            del: [{ condition: true, step: ["del_char", "first_num"] }],
             dot: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
             minus: [
                {
@@ -181,6 +188,7 @@ const supv_fsm = {
          },
          second_num: {
             ac: [{ condition: true, step: ["clear_all", "init"] }],
+            del: [{ condition: true, step: ["del_char", "first_num"] }],
             dot: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
             eq: [{ condition: () => num_fsm.is_tstate(num_state), step: ["calc", "calc_num"] }],
             minus: [
@@ -203,6 +211,7 @@ const supv_fsm = {
          },
          calc_num: {
             ac: [{ condition: true, step: ["clear_all", "init"] }],
+            del: [{ condition: true, step: ["del_char", "first_num"] }],
             minus: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
