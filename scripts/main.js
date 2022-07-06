@@ -18,6 +18,7 @@ import { calculate } from "./calculator.mjs";
       { key: "7", id: "#num7", value: "7" },
       { key: "8", id: "#num8", value: "8" },
       { key: "9", id: "#num9", value: "9" },
+      { key: "e", id: "#base", value: "e" },
       { key: "-", id: "#sub", value: "-" },
       { key: ".", id: "#dot", value: "." },
       { key: "+", id: "#add", value: "+" },

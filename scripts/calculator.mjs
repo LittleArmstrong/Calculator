@@ -13,11 +13,11 @@ export function calculate(
    { expr = "", num_state = "init", supv_state = "init", log = [] } = {}
 ) {
    // run expr through calculate again to get states?
+   const array_chars = chars.split("");
    let new_expr = expr;
    let next_num_state = num_state;
    let next_supv_state = supv_state;
-   const array_chars = chars.split("");
-   const new_log = log;
+   let new_log = log;
 
    while (array_chars.length !== 0) {
       const actions = [];
@@ -40,7 +40,7 @@ export function calculate(
             case "add_char":
                //add the inputted char to the expression and log this event
                new_expr += char;
-               log.push({
+               new_log.push({
                   char: char,
                   event: char_event,
                   supv_state: supv_state,
@@ -61,7 +61,7 @@ export function calculate(
                //calculate the expression and reset log and number creation
                new_expr = "" + calc_expr(new_expr);
                next_num_state = num_fsm.init_state;
-               log = [];
+               new_log = [];
                break;
             case "calc_next":
                //combination of calculation the expression and adding the operator
@@ -75,7 +75,7 @@ export function calculate(
             case "del_char":
                //delete the last char or if calculated the the calculated number
                //depending on the log
-               let last_event_log = log.pop();
+               let last_event_log = new_log.pop();
                new_expr = last_event_log ? new_expr.slice(0, -1) : "";
                next_num_state = last_event_log?.num_state ?? next_num_state;
                next_supv_state = last_event_log?.supv_state ?? next_supv_state;
@@ -86,7 +86,7 @@ export function calculate(
          }
       }
    }
-   return [new_expr, next_supv_state, next_num_state, log];
+   return [new_expr, next_supv_state, next_num_state, new_log];
 
    //returns new expr and states
 }
@@ -122,6 +122,7 @@ const num_fsm = {
          },
          float: {
             num: ["float", "add_char"],
+            base: ["base", "add_char"],
          },
          base: {
             minus: ["exp_sign", "add_char"],
@@ -176,6 +177,7 @@ const supv_fsm = {
          },
          first_num: {
             ac: [{ condition: true, step: ["clear_all", "init"] }],
+            base: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
             del: [{ condition: true, step: ["del_char", "first_num"] }],
             dot: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
             minus: [
@@ -198,6 +200,7 @@ const supv_fsm = {
          },
          second_num: {
             ac: [{ condition: true, step: ["clear_all", "init"] }],
+            base: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
             del: [{ condition: true, step: ["del_char", "first_num"] }],
             dot: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
             eq: [{ condition: () => num_fsm.is_tstate(num_state), step: ["calc", "calc_num"] }],
