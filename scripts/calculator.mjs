@@ -1,3 +1,4 @@
+//@ts-check
 /**
  * Takes an input of chars, validates it and if applicable, evaluates it then returns it
  * @param {string} chars String of chars input to be evaluated
@@ -5,12 +6,18 @@
  * @param {string} settings.expr Previous validated expression
  * @param {string} settings.num_state Current number FSM state
  * @param {string} settings.supv_state Current supervisor state
+ * @param {object[]} settings.log Current log of events
  * @returns a validated and evaluated expression
  */
-
+//{ expr = "", num_state = "init", supv_state = "init", log = [] } = {}
 export function calculate(
    chars,
-   { expr = "", num_state = "init", supv_state = "init", log = [] } = {}
+   { expr, num_state, supv_state, log } = {
+      expr: "",
+      num_state: "init",
+      supv_state: "init",
+      log: [],
+   }
 ) {
    // run expr through calculate again to get states?
    const array_chars = chars.split("");
@@ -22,7 +29,7 @@ export function calculate(
    while (array_chars.length !== 0) {
       const actions = [];
       let action = "";
-      let char = array_chars.shift();
+      let char = array_chars.shift() ?? "";
       let char_event = get_char_event(char);
       [action, next_supv_state] = supv_fsm.accept({
          event: char_event,
@@ -177,14 +184,14 @@ const supv_fsm = {
    accept({ event, state, num_state }) {
       const transitions = {
          init: {
-            minus: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
-            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            minus: [{ condition: () => true, step: ["call_num_fsm", "first_num"] }],
+            num: [{ condition: () => true, step: ["call_num_fsm", "first_num"] }],
          },
          first_num: {
-            ac: [{ condition: true, step: ["clear_all", "init"] }],
-            base: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
-            del: [{ condition: true, step: ["del_char", "first_num"] }],
-            dot: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            ac: [{ condition: () => true, step: ["clear_all", "init"] }],
+            base: [{ condition: () => true, step: ["call_num_fsm", "first_num"] }],
+            del: [{ condition: () => true, step: ["del_char", "first_num"] }],
+            dot: [{ condition: () => true, step: ["call_num_fsm", "first_num"] }],
             minus: [
                {
                   condition: () => num_fsm.is_sign_state(num_state),
@@ -195,7 +202,7 @@ const supv_fsm = {
                   step: ["next_num", "second_num"],
                },
             ],
-            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            num: [{ condition: () => true, step: ["call_num_fsm", "first_num"] }],
             op: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
@@ -204,10 +211,10 @@ const supv_fsm = {
             ],
          },
          second_num: {
-            ac: [{ condition: true, step: ["clear_all", "init"] }],
-            base: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
-            del: [{ condition: true, step: ["del_char", "first_num"] }],
-            dot: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+            ac: [{ condition: () => true, step: ["clear_all", "init"] }],
+            base: [{ condition: () => true, step: ["call_num_fsm", "second_num"] }],
+            del: [{ condition: () => true, step: ["del_char", "first_num"] }],
+            dot: [{ condition: () => true, step: ["call_num_fsm", "second_num"] }],
             eq: [{ condition: () => num_fsm.is_tstate(num_state), step: ["calc", "calc_num"] }],
             minus: [
                {
@@ -219,7 +226,7 @@ const supv_fsm = {
                   step: ["calc_next", "second_num"],
                },
             ],
-            num: [{ condition: true, step: ["call_num_fsm", "second_num"] }],
+            num: [{ condition: () => true, step: ["call_num_fsm", "second_num"] }],
             op: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
@@ -228,15 +235,15 @@ const supv_fsm = {
             ],
          },
          calc_num: {
-            ac: [{ condition: true, step: ["clear_all", "init"] }],
-            del: [{ condition: true, step: ["del_char", "first_num"] }],
+            ac: [{ condition: () => true, step: ["clear_all", "init"] }],
+            del: [{ condition: () => true, step: ["del_char", "first_num"] }],
             minus: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
                   step: ["calc_next", "second_num"],
                },
             ],
-            num: [{ condition: true, step: ["new_num", "first_num"] }],
+            num: [{ condition: () => true, step: ["new_num", "first_num"] }],
             op: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
@@ -246,10 +253,13 @@ const supv_fsm = {
          },
       };
       const def_step = ["ignore", state];
-      const def_event = [{ condition: true, step: def_step }];
-      const next = (transitions[state][event] ?? transitions[state][def_event] ?? def_event).find(
-         (step) => (typeof step.condition === "function" ? step.condition() : step.condition)
-      );
+      const def_event_name = "def";
+      const def_event = [{ condition: () => true, step: def_step }];
+      const next = (
+         transitions[state][event] ??
+         transitions[state][def_event_name] ??
+         def_event
+      ).find((step) => step.condition());
       return next?.step ?? def_step;
    },
 };
@@ -297,31 +307,35 @@ function calc_expr(expr) {
          result = div(numbers);
          break;
       default:
-         return error(`No such case: "${operator}"`);
+         console.error(`No such case: "${operator}"`);
+         result = "ERR";
    }
-   return Number.isFinite(result) ? result : "ERR";
+   return Number.isFinite(result) ? String(result) : "ERR";
 }
 
 /**
  * Parses a string expression for numbers and operators
  * @param {String} expr The math expression to be parsed
- * @returns the numbers and operator extracted from the expression
+ * @returns {[number[], string]} the numbers and operator extracted from the expression
  */
 
 function parse_math_expr(expr) {
    //first regex matches first number (with sign if present) and second matches second number (with sign if preceded by an operator)
-   //converts the strings tu numbers
-   const numbers = expr
-      .match(/^-?\d*\.?\d+(?:e[-+]?\d+)?|(?<=[-+*/])-?\d*\.?\d+(?:e[-+]?\d+)?/g)
-      .map(Number);
+   //converts the strings to numbers
+   const first_num = expr?.match(/^-?\d*\.?\d+(?:e[-+]?\d+)?/)?.map(Number)?.[0] ?? NaN;
+   const second_num = expr?.match(/(?<=[-+*/])-?\d*\.?\d+(?:e[-+]?\d+)?$/)?.map(Number)?.[0] ?? NaN;
+   const numbers = [first_num, second_num];
+   // const numbers = expr
+   //    ?.match(/^-?\d*\.?\d+(?:e[-+]?\d+)?|(?<=[-+*/])-?\d*\.?\d+(?:e[-+]?\d+)?/g)
+   //    ?.map(Number) ?? [NaN, NaN];
    // takes the first operator that is preceded by a number
-   const operator = expr.match(/(?<=\d.?)[-+*\/]/)[0];
+   const operator = expr?.match(/(?<=\d.?)[-+*\/]/)?.[0] ?? "none";
    return [numbers, operator];
 }
 
 /**
  * Adds two numbers together and returns the result
- * @param {[number, number]} param0 Numbers for the addtiion
+ * @param {number[]} param0 Numbers for the addtiion
  * @returns {number} the result
  */
 function add([num1, num2]) {
@@ -330,7 +344,7 @@ function add([num1, num2]) {
 
 /**
  * Subtracts the second number from the first and returns the result
- * @param {[number, number]} param0 Numbers for the subtraction
+ * @param {number[]} param0 Numbers for the subtraction
  * @returns {number} the result
  */
 function sub([num1, num2]) {
@@ -339,7 +353,7 @@ function sub([num1, num2]) {
 
 /**
  * Multiplicates two numbers and returns the result
- * @param {[number, number]} param0 Numbers for the multiplication
+ * @param {number[]} param0 Numbers for the multiplication
  * @returns the result
  */
 function mul([num1, num2]) {
@@ -348,7 +362,7 @@ function mul([num1, num2]) {
 
 /**
  * Divides the first number with the second one and returns the result
- * @param {[number, number]} param0 Numbers for the division
+ * @param {number[]} param0 Numbers for the division
  * @returns the result
  */
 
