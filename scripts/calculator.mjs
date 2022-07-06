@@ -57,6 +57,11 @@ export function calculate(
                next_num_state = num_fsm.init_state;
                actions.unshift("add_char");
                break;
+            case "new_num":
+               //start the creation of the second number and add the operator
+               next_num_state = num_fsm.init_state;
+               actions.unshift("clear_all", "call_num_fsm");
+               break;
             case "calc":
                //calculate the expression and reset log and number creation
                new_expr = "" + calc_expr(new_expr);
@@ -231,7 +236,7 @@ const supv_fsm = {
                   step: ["calc_next", "second_num"],
                },
             ],
-            num: [{ condition: true, step: ["call_num_fsm", "first_num"] }],
+            num: [{ condition: true, step: ["new_num", "first_num"] }],
             op: [
                {
                   condition: () => num_fsm.is_tstate(num_state),
